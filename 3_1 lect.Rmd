@@ -1,0 +1,110 @@
+---
+title: "3_8 Lecture"
+output: html_notebook
+---
+
+
+Install GenomicDataCommons package
+```{r}
+source("http://bioconductor.org/biocLite.R")
+biocLite("GenomicDataCommons")
+biocLite("maftools")
+```
+
+Now to check the GDC status
+```{r}
+library(GenomicDataCommons)
+library(maftools)
+GenomicDataCommons::status()
+```
+
+
+##Querying the GDC from R
+There are 4 main sets of metadata we can query with this package. Let's start with cases().
+```{r}
+cases_by_project <- cases() %>%
+  facet("project.project_id") %>%
+  aggregations()
+head(cases_by_project)
+```
+
+```{r}
+View(cases_by_project)
+## This code snipet is taken from the package vignette
+file_records <- files() %>%
+  filter(~ cases.project.project_id == "TCGA-PAAD" &
+    data_type == "Gene Expression Quantification" &
+    analysis.workflow_type == "HTSeq - Counts") %>%
+  response_all()
+```
+
+```{r}
+View(file_records)
+```
+
+```{r}
+x <- cases_by_project$project.project_id
+colvec <- rep ("lightblue", nrow(x))
+colvec[which(x[,1]=="TCGA-PAAD")] <- "red"
+barplot(x[,2],names.arg = x[,1], log="y", col=colvec, las=2,cex.lab =.7)
+```
+
+```{r}
+## This code snipet is taken from the package vignette
+file_records <- files() %>%
+  filter(~ cases.project.project_id == "TCGA-PAAD" &
+    data_type == "Gene Expression Quantification" &
+    analysis.workflow_type == "HTSeq - Counts") %>%
+  response_all()
+```
+The following command shows RNA-Seq data from the TCGA-PAAD project. At this time of writing there are 182 RNA-Seq data files, one for each row.
+```{r}
+View(file_records$results)
+```
+
+##Variant analysis with R
+On the NCI-GDC website you would need to go through the Advanced Search Page and then construct a a search query to find MAF format somatic muation files for our "TCGA-PAAD" project.
+```{r}
+maf.files = files() %>%
+    filter(~ cases.project.project_id == 'TCGA-PAAD' &
+        data_type == 'Masked Somatic Mutation' &
+        data_format == "MAF" &
+        analysis.workflow_type == "MuTect2 Variant Aggregation and Masking"
+    ) %>%
+    response_all()
+```
+```{r}
+View(maf.files)
+head(maf.files$results)
+```
+
+We will use ids() to pull out the unique identifier for our MAF file.
+```{r}
+uid <- ids(maf.files)
+uid
+```
+
+Once we have the unique identifier(s) (in this case, only this one), use gdcdata() to download the associated files and returns a file name for each identifier.
+```{r}
+maffile = gdcdata(uid, destination_dir = ".")
+maffile
+```
+
+**MAF analysis**
+The MAf file is now stored locally and the maftools package workflow which starts with a MAF file, can proceed, starting with reading the pancreatic cancer MAF file.
+```{r}
+vars = read.maf(maf = maffile, verbose = FALSE)
+```
+
+**Plotting MAF Summary**
+```{r}
+plotmafSummary(maf =vars, rmOutlier = TRUE,
+               addStat = 'median', dashboard = TRUE,
+               titvRaw = FALSE)
+```
+
+**Drawing oncoplots**
+```{r}
+oncoplot(maf = vars, top = 10)
+```
+

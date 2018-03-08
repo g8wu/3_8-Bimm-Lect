@@ -1,0 +1,114 @@
+---
+title: "3_8 Lect pt.2"
+output: html_notebook
+---
+
+#Designing a personal cancer vaccine
+
+##Section 1: Protein seqs from healthy and tumor tissue
+
+Do a muscle alignment for given lecture_18 seqs
+
+```{r}
+library(bio3d)
+seqs <- read.fasta("lecture18_sequences.fa")
+seqs
+
+```
+
+```{r}
+## Calculate positional identity scores
+ide <- conserv(seqs$ali, method="identity")
+mutant.sites <- which(ide < 1) 
+```
+
+Going over sequence alignment...
+```{r}
+# could align but not necessary here
+#aln <- seqaln(seqs)
+
+# score residue conservation to find non identical sites 
+## 1.0 i match, .5 is mismatch
+con <- conserv(seqs, method = "identity")
+#con
+
+# which positions are not identical
+which(con <1)
+## [1]  41  65 213
+
+## Exclude gap possitions from analysis
+gaps <- gap.inspect(seqs)
+mutant.sites <- mutant.sites[mutant.sites %in% gaps$f.inds]
+
+## cancer specific mutant sites
+mutant.sites <- mutant.sites[1:4]
+
+## include flanking seqs
+start.pos <- mutant.sites-8
+end.pos <- mutant.sites +8
+
+## resulting extraction
+result.seq <- seqs$ali[,start.pos[1]:end.pos[1]]
+
+
+subseq.ind <- (41-8):(41+8)
+
+seqs$ali["P53_mutant", subseq.ind]
+```
+
+We can use these indices stored in mutant.sites to extract subsequences as required for this activity.
+```{r}
+# Make a "names" label for our output sequences (one per mutant)
+mutant.names <- paste0(seqs$ali["P53_wt",mutant.sites],
+                       mutant.sites,
+                       seqs$ali["P53_mutant",mutant.sites])
+
+mutant.names
+```
+
+Now to extract all 9-mer mutant ecompassing sequences for each mutant site. 
+```{r}
+## Sequence positions surounding each mutant site
+start.position <- mutant.sites - 8
+end.position <-  mutant.sites + 8
+
+# Blank matrix to store sub-sequences
+store.seqs <- matrix("-", nrow=length(mutant.sites), ncol=17)
+rownames(store.seqs) <- mutant.names
+
+## Extract each sub-sequence
+wt.subsequence <- NULL
+mutant.subsequences <- NULL
+for(i in 1:length(mutant.sites)) {
+  store.seqs[i,] <- seqs$ali["P53_mutant",start.pos[i]:end.pos[i]]
+  wt.subsequence <- rbind(wt.subsequence, subseq()[1,])
+  mutant.subsequences <- rbind(mutant.subsequences, subseq[2,])
+}
+
+store.seqs
+```
+
+Finally, output to FASTA file
+```{r}
+## Output a FASTA file for further analysis
+write.fasta(seqs=store.seqs, ids=mutant.names, file="subsequences.fa")
+```
+##Sidenote: Input sequence setup
+Just to try it, here we use Uniprot KRas oncogene seq as an example iput and make 4 substations at random positions.
+```{r}
+#library(bio3d)
+## Read KRas oncogene sequence from UniProt
+wt <- get.seq("P01116")
+
+## Here we make four mutants namely: G12V, Q22N, T74S and A130V
+mutant <- wt
+mutant$ali[ c(12,22,74,130)] <- c("V", "N", "S", "V")
+
+write.fasta( seqbind(wt, mutant), ids=c("wt","mutant"), file="kras-sequences.fa")
+```
+Check
+```{r}
+sessionInfo()
+```
+
+
